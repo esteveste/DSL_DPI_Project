@@ -1,0 +1,5 @@
+tianshou
+numpy
+gym
+gym_minigrid
+torch

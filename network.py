@@ -1,6 +1,7 @@
 import torch, numpy as np
 from torch import nn
 
+
 class MLP(nn.Module):
     def __init__(self, state_shape, action_shape):
         super().__init__()
@@ -15,13 +16,8 @@ class MLP(nn.Module):
         if not isinstance(obs, torch.Tensor):
             obs = torch.tensor(obs, dtype=torch.float)
 
-        assert len(obs.shape)>=2, "obs shape is less than 2 dim, has batch?"
+        assert len(obs.shape) >= 2, "obs shape is less than 2 dim, has batch?"
 
         batch = obs.shape[0]
         logits = self.model(obs.view(batch, -1))
         return logits, state
-
-# state_shape = env.observation_space.shape or env.observation_space.n
-# action_shape = env.action_space.shape or env.action_space.n
-# net = Net(state_shape, action_shape)
-# optim = torch.optim.Adam(net.parameters(), lr=1e-3)

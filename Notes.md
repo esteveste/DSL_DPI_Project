@@ -1,4 +1,5 @@
 # Minigrid actions
+
 ```
 Actions in the basic environment:
 
@@ -11,3 +12,5 @@ Toggle (open doors, interact with objects)
 Done (task completed, optional)
 
 ```
+
+Tianshou not used for anything

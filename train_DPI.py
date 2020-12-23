@@ -23,7 +23,8 @@ from utils import *
 
 def get_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--task', type=str, default='MiniGrid-Empty-Random-6x6-v0')
+    # parser.add_argument('--task', type=str, default='MiniGrid-DoorKey-5x5-v0')
+    parser.add_argument('--task', type=str, default='MiniGrid-Empty-Random-5x5-v0')
     # parser.add_argument('--task', type=str, default='MiniGrid-Empty-16x16-v0')
     parser.add_argument('--seed', type=int, default=0)
     # parser.add_argument('--eps-test', type=float, default=0.005)
@@ -57,8 +58,14 @@ def train_dpi(args):
     env = make_minigrid_env(args.task)
 
     state_shape = env.observation_space.shape or env.observation_space.n
-    # action_shape = env.env.action_space.shape or env.env.action_space.n
-    action_shape = 3  # selecting Basic actions in minigrid
+
+    if "MiniGrid" in args.task:
+        if "Empty" in args.task:
+            action_shape = 3  # selecting Basic actions in minigrid
+        else:
+            action_shape = 6  # all except done
+    else:
+        action_shape = env.env.action_space.shape or env.env.action_space.n
 
     print("Observations shape:", state_shape)
     print("Actions shape:", action_shape)
@@ -88,20 +95,19 @@ def train_dpi(args):
     if "MiniGrid" in args.task:
         tabular_env = Tabular_Minigrid(env)
 
-    print(f"Num states: {tabular_env.nr_states}")
+    print(f"Num states: {tabular_env.nr_states}, Q table entries: {tabular_env.q.numel()}")
 
     # Training loop
     for e in range(args.epoch):
-        tabular_env.__init_q_states__()
-
         # collect qs
+        tabular_env.__init_q_states__()
         tabular_env.travel_state_actions(policy)
 
         # learn new policy
         policy.learn(tabular_env)
 
-        scores = evaluate(policy, env, runs=10)
-
+        # evaluation
+        scores = evaluate(policy, env, runs=5)
         print(f"Eval Score: {scores.mean():.2f} +- {scores.std():.2f} Total registered q:", tabular_env.q.sum().item())
 
 
@@ -112,12 +118,16 @@ def evaluate(policy, env, runs=2):
     for i in range(runs):
         done = False
         obs = env.reset()
-        ep_reward=0
+        ep_reward = 0
+
+        # env.render()
 
         while not done:
             action = policy.forward([obs])
             obs, r, done, _ = env.step(action)
             ep_reward += r
+
+            env.render()
 
         total_scores[i] = ep_reward
 

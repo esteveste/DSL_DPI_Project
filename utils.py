@@ -7,6 +7,7 @@ import numpy as np
 
 import random
 
+
 # gym_minigrid.wrappers.FlatObsWrapper
 
 def make_minigrid_env(name='MiniGrid-Empty-5x5-v0'):
@@ -24,7 +25,13 @@ class Tabular_Minigrid():
         self.state_shape = env.observation_space.shape or env.observation_space.n
 
         self.height = env.env.grid.height - 2  # assume square grid always
-        self.actions = [0, 1, 2]  # hardcoded, left/right/forwad
+
+        # configure forced actions in rollout
+        env_name = env.spec.id
+        if "Empty" in env_name:
+            self.actions = [0, 1, 2]  # hardcoded, left/right/forward
+        else:
+            self.actions = [0, 1, 2, 3, 4, 5] 
 
         self.__init_q_states__()
 
@@ -38,9 +45,21 @@ class Tabular_Minigrid():
 
         self.nr_states = self.height * self.height * 4
 
+    def set_minigrid_env_state(self, agent_pos: tuple, dir: int):
+        assert dir >= 0 and dir < 4, "Minigrid state set, invalid agent direction"
+
+        # correct tuples
+        agent_pos = (agent_pos[0] + 1, agent_pos[1] + 1)
+
+        assert isinstance(agent_pos, tuple) and len(agent_pos) == 2 and agent_pos[0] < self.height + 1 \
+               and agent_pos[1] < self.height + 1 and agent_pos[0] > 0 and agent_pos[
+                   1] > 0, "Minigrid state set, invalid agent direction"
+
+        self.env.env.agent_pos = agent_pos
+        self.env.env.agent_dir = dir
+
+    #
     def travel_state_actions(self, policy):
-
-
 
         # go over all possible states and actions
         for h in range(self.height):
@@ -57,6 +76,8 @@ class Tabular_Minigrid():
                         self.env.reset()
                         self.set_minigrid_env_state((h, w), dir)
 
+                        # self.env.render()
+
                         if a == 0:  # only do it once
                             # get state observation, by perfoming done action
                             obs, _, _, _ = self.env.step(6)
@@ -70,16 +91,22 @@ class Tabular_Minigrid():
 
                         self.q[h, w, dir, a] += self.perform_rollout(obs, r, policy)
 
-    # def get_possible_states_list(self):
-    #     # dont love this, but for shuffling
-    #     states = np.zeros((self.height, self.height, 4, 3))
-    #
-    #     for h in range(self.height):
-    #         for w in range(self.height):
-    #             for dir in range(4):  # every direction
-    #                 states[h, w, dir] = [h, w, dir]
-    #
-    #     return states.reshape(-1, 3)
+    def perform_rollout(self, obs, r, policy, horizon=100):
+
+        gamma = policy._gamma  # starts to show bad code/abstraction
+
+        q_value = r
+
+        for i in range(1, horizon + 1):
+
+            action = policy.forward([obs])
+            obs, r, done, _ = self.env.step(action)
+
+            q_value += r * (gamma ** i)
+            if done:
+                break
+
+        return q_value
 
     def get_train_batch(self, batch=64):
 
@@ -105,32 +132,13 @@ class Tabular_Minigrid():
         for i in range(0, self.nr_states, batch):
             yield q[indexes[i:i + batch]], state_obs[indexes[i:i + batch]]
 
-    def perform_rollout(self, obs, r, policy, horizon=100):
-
-        gamma = policy._gamma  # starts to show bad code/abstraction
-
-        q_value = r
-
-        for i in range(1, horizon + 1):
-
-            action = policy.forward([obs])
-            obs, r, done, _ = self.env.step(action)
-
-            q_value += r * (gamma ** i)
-            if done:
-                break
-
-        return q_value
-
-    def set_minigrid_env_state(self, agent_pos: tuple, dir: int):
-        assert dir >= 0 and dir < 4, "Minigrid state set, invalid agent direction"
-
-        # correct tuples
-        agent_pos = (agent_pos[0] + 1, agent_pos[1] + 1)
-
-        assert isinstance(agent_pos, tuple) and len(agent_pos) == 2 and agent_pos[0] < self.height + 1 \
-               and agent_pos[1] < self.height + 1 and agent_pos[0] > 0 and agent_pos[
-                   1] > 0, "Minigrid state set, invalid agent direction"
-
-        self.env.env.agent_pos = agent_pos
-        self.env.env.agent_dir = dir
+    # def get_possible_states_list(self):
+    #     # dont love this, but for shuffling
+    #     states = np.zeros((self.height, self.height, 4, 3))
+    #
+    #     for h in range(self.height):
+    #         for w in range(self.height):
+    #             for dir in range(4):  # every direction
+    #                 states[h, w, dir] = [h, w, dir]
+    #
+    #     return states.reshape(-1, 3)

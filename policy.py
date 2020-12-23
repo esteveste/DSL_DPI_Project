@@ -39,6 +39,10 @@ class DPI():
     def forward(self, obs):
 
         q, _ = self.model(obs)
+
+        # something like this, on random exploration?
+        # q=q+torch.rand_like(q)*0.1
+
         action = to_numpy(q.max(dim=1)[1])  # choose max q
 
         return action
@@ -59,13 +63,13 @@ class DPI():
                 pred_q, _ = self.model(obs)
 
                 # target = torch.argmax(qs, dim=1)  # target is max q
-                target =torch.argmax( torch.rand(*qs.shape) * (qs==qs.max(dim=1,keepdims=True)[0]),dim=1)
+                target = torch.argmax(torch.rand(*qs.shape) * (qs == qs.max(dim=1, keepdims=True)[0]), dim=1)
                 loss = self.criterion(pred_q, target)
                 loss.backward()
 
                 self.optim.step()
 
-                # stats
+                # statistics
                 # pred_target = pred_q.argmax(dim=1)
 
                 total_loss += loss.item()
@@ -73,6 +77,8 @@ class DPI():
             print(f"Epoch {e:2d}, Loss {total_loss / nr_states:.4f}")
 
         return loss
+
+##### old tianshou code
 
 # class DPI(BasePolicy):
 #     """Based on Deep Q Class
