@@ -20,9 +20,11 @@ from policy import DPI
 from network import MLP
 from utils import *
 
+
 def get_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--task', type=str, default='MiniGrid-Empty-5x5-v0')
+    parser.add_argument('--task', type=str, default='MiniGrid-Empty-Random-6x6-v0')
+    # parser.add_argument('--task', type=str, default='MiniGrid-Empty-16x16-v0')
     parser.add_argument('--seed', type=int, default=0)
     # parser.add_argument('--eps-test', type=float, default=0.005)
     # parser.add_argument('--eps-train', type=float, default=1.)
@@ -32,7 +34,8 @@ def get_args():
     parser.add_argument('--gamma', type=float, default=0.99)
     # parser.add_argument('--n-step', type=int, default=3)
     # parser.add_argument('--target-update-freq', type=int, default=500)
-    parser.add_argument('--epoch', type=int, default=100)
+    parser.add_argument('--epoch', type=int, default=10)
+    parser.add_argument('--policy-epoch', type=int, default=4)
     # parser.add_argument('--step-per-epoch', type=int, default=10000)
     parser.add_argument('--collect-per-step', type=int, default=10)
     parser.add_argument('--batch-size', type=int, default=32)
@@ -55,7 +58,7 @@ def train_dpi(args):
 
     state_shape = env.observation_space.shape or env.observation_space.n
     # action_shape = env.env.action_space.shape or env.env.action_space.n
-    action_shape = 3 # selecting Basic actions in minigrid
+    action_shape = 3  # selecting Basic actions in minigrid
 
     print("Observations shape:", state_shape)
     print("Actions shape:", action_shape)
@@ -68,12 +71,12 @@ def train_dpi(args):
     # train_envs.seed(args.seed)
     # test_envs.seed(args.seed)
 
-    net = MLP(state_shape,action_shape)
+    net = MLP(state_shape, action_shape)
 
     optim = torch.optim.Adam(net.parameters(), lr=args.lr)
 
     # define policy
-    policy= DPI(net,optim,discount_factor=0.99)
+    policy = DPI(net, optim, discount_factor=0.99)
 
     # # load a previous policy
     if args.resume_path:
@@ -82,6 +85,43 @@ def train_dpi(args):
         ))
         print("Loaded agent from: ", args.resume_path)
 
+    if "MiniGrid" in args.task:
+        tabular_env = Tabular_Minigrid(env)
+
+    print(f"Num states: {tabular_env.nr_states}")
+
+    # Training loop
+    for e in range(args.epoch):
+        tabular_env.__init_q_states__()
+
+        # collect qs
+        tabular_env.travel_state_actions(policy)
+
+        # learn new policy
+        policy.learn(tabular_env)
+
+        scores = evaluate(policy, env, runs=10)
+
+        print(f"Eval Score: {scores.mean():.2f} +- {scores.std():.2f} Total registered q:", tabular_env.q.sum().item())
+
+
+def evaluate(policy, env, runs=2):
+    # simple evaluation, from init state
+    total_scores = np.zeros(runs)
+
+    for i in range(runs):
+        done = False
+        obs = env.reset()
+        ep_reward=0
+
+        while not done:
+            action = policy.forward([obs])
+            obs, r, done, _ = env.step(action)
+            ep_reward += r
+
+        total_scores[i] = ep_reward
+
+    return total_scores
 
 
 if __name__ == "__main__":
