@@ -31,7 +31,7 @@ class Tabular_Minigrid():
         if "Empty" in env_name:
             self.actions = [0, 1, 2]  # hardcoded, left/right/forward
         else:
-            self.actions = [0, 1, 2, 3, 4, 5] 
+            self.actions = [0, 1, 2, 3, 4, 5]
 
         self.__init_q_states__()
 
@@ -45,6 +45,7 @@ class Tabular_Minigrid():
 
         self.nr_states = self.height * self.height * 4
 
+    # sets the env to the correct gym, used in travel_state_actions
     def set_minigrid_env_state(self, agent_pos: tuple, dir: int):
         assert dir >= 0 and dir < 4, "Minigrid state set, invalid agent direction"
 
@@ -58,7 +59,26 @@ class Tabular_Minigrid():
         self.env.env.agent_pos = agent_pos
         self.env.env.agent_dir = dir
 
-    #
+    # performs the rollout and calculates the qs with the policy
+    # after selected on travel_state_actions()
+    def perform_rollout(self, obs, r, policy, horizon=100):
+
+        gamma = policy._gamma  # starts to show bad code/abstraction
+
+        q_value = r
+
+        for i in range(1, horizon + 1):
+
+            action = policy.forward([obs])
+            obs, r, done, _ = self.env.step(action)
+
+            q_value += r * (gamma ** i)
+            if done:
+                break
+
+        return q_value
+
+    # goes over every state-action pair of the environment
     def travel_state_actions(self, policy):
 
         # go over all possible states and actions
@@ -91,23 +111,8 @@ class Tabular_Minigrid():
 
                         self.q[h, w, dir, a] += self.perform_rollout(obs, r, policy)
 
-    def perform_rollout(self, obs, r, policy, horizon=100):
-
-        gamma = policy._gamma  # starts to show bad code/abstraction
-
-        q_value = r
-
-        for i in range(1, horizon + 1):
-
-            action = policy.forward([obs])
-            obs, r, done, _ = self.env.step(action)
-
-            q_value += r * (gamma ** i)
-            if done:
-                break
-
-        return q_value
-
+    # gets a shufled training batch from the q table, to be used
+    # on the policy.learn()
     def get_train_batch(self, batch=64):
 
         assert batch > 0, "batch =< 0"

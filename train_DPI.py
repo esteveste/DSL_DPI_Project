@@ -127,7 +127,7 @@ def evaluate(policy, env, runs=2):
             obs, r, done, _ = env.step(action)
             ep_reward += r
 
-            env.render()
+            # env.render()
 
         total_scores[i] = ep_reward
 
