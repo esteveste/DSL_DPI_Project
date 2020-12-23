@@ -4,8 +4,6 @@ import numpy as np
 from copy import deepcopy
 from typing import Any, Dict, Union, Optional
 
-from tqdm import tqdm
-
 # from tianshou.policy import BasePolicy
 from tianshou.data import Batch, ReplayBuffer, to_torch_as, to_numpy
 
@@ -54,7 +52,7 @@ class DPI():
 
         for e in range(self.epochs):
             total_loss = 0
-            for qs, obs in tqdm(tabular_env.get_train_batch(self.batch_size)):
+            for qs, obs in tabular_env.get_train_batch(self.batch_size):
                 self.optim.zero_grad()
 
                 # just copy q for now
