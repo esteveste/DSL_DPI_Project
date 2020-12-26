@@ -2,17 +2,14 @@
 
 ### Dependencies
 
-```python
-pip
-install - r
-requirements.txt
+```bash 
+pip install -r requirements.txt
 ```
 
 example execution
 
-```python
-python
-train_DPI.py --task MiniGrid-Empty-Random-5x5-v0
+```bash
+python train_DPI.py --task MiniGrid-Empty-Random-5x5-v0
 ```
 
 #### Files
