@@ -12,7 +12,7 @@ example execution
 
 ```python
 python
-train_DPI.py - -task 
+train_DPI.py --task MiniGrid-Empty-Random-5x5-v0
 ```
 
 #### Files
