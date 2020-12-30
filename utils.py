@@ -7,6 +7,7 @@ import numpy as np
 
 import random
 
+import pdb
 
 # gym_minigrid.wrappers.FlatObsWrapper
 
@@ -19,7 +20,9 @@ def make_minigrid_env(name='MiniGrid-Empty-5x5-v0'):
 
 
 class Tabular_Minigrid():
-    def __init__(self, env):
+    def __init__(self, env,sample_n_states=50):
+
+        self.sample_n_states = sample_n_states
 
         self.env = env
         self.state_shape = env.observation_space.shape or env.observation_space.n
@@ -40,6 +43,7 @@ class Tabular_Minigrid():
         # grid*grid*possible directions * actions
         # smallest -> 5*5*4*3 = 300
         self.q = torch.zeros(self.height, self.height, 4, len(self.actions))
+        self.q += -1
         self.state_obs = torch.zeros(self.height, self.height, 4,
                                      np.prod(self.state_shape))  # testing in size, otherwise
 
@@ -78,63 +82,63 @@ class Tabular_Minigrid():
 
         return q_value
 
+    def random_state(self,N):
+
+        for n in range(N):
+            yield np.random.choice(range(self.height)),np.random.choice(range(self.height)),np.random.choice(range(4))
+
+
     # goes over every state-action pair of the environment
     def travel_state_actions(self, policy):
 
         # go over all possible states and actions
-        for h in range(self.height):
-            for w in range(self.height):
-                for dir in range(4):  # every direction
+        # for h in range(self.height):
+        #     for w in range(self.height):
+        #         for dir in range(4):  # every direction
+        for h,w,dir in self.random_state(N=self.sample_n_states):
 
-                    # # run less
-                    # if random.random() > (200/self.nr_states):
-                    #     break
+            # # # run less
+            # if random.random() > (200/self.nr_states):
+            #     break
 
-                    for a in self.actions:
-                        # for j in range(1): #rollouts per state-pair wise, deterministic so 1
+            for a in self.actions:
+                # for j in range(1): #rollouts per state-pair wise, deterministic so 1
 
-                        self.env.reset()
-                        self.set_minigrid_env_state((h, w), dir)
+                self.env.reset()
+                self.set_minigrid_env_state((h, w), dir)
 
-                        # self.env.render()
+                # self.env.render()
 
-                        if a == 0:  # only do it once
-                            # get state observation, by perfoming done action
-                            obs, _, _, _ = self.env.step(6)
-                            # save initial observation state for later
-                            self.state_obs[h, w, dir] = torch.from_numpy(obs.reshape(-1))
+                if a == 0:  # only do it once
+                    # get state observation, by perfoming useless action (done action)
+                    obs, _, _, _ = self.env.step(6)
+                    # save initial observation state for later
+                    self.state_obs[h, w, dir] = torch.from_numpy(obs.reshape(-1))
 
-                        # perform exploration action step in dpi algorightm
-                        obs, r, d, _ = self.env.step(a)
+                # perform exploration action step in dpi algorightm
+                obs, r, d, _ = self.env.step(a)
 
-                        # FIXME obs probably needs batch, almost for sure
-
-                        self.q[h, w, dir, a] += self.perform_rollout(obs, r, policy)
+                self.q[h, w, dir, a] = self.perform_rollout(obs, r, policy) # FIXME FAZER A MEDIA
 
     # gets a shufled training batch from the q table, to be used
     # on the policy.learn()
-    def get_train_batch(self, batch=64):
+    def get_train_batch(self, batch=8):
 
         assert batch > 0, "batch =< 0"
 
-        # states = self.get_possible_states_list()
-        # np.random.shuffle(states) # performance.... shufles in dim 0
-        # nr_states = states.shape[0]
-        #
-        # for i in range(0,nr_states,batch):
-        #
-
-        # diff aproach
-
-        q = self.q.view(-1, len(self.actions))
+        q = self.q.view(-1, len(self.actions)) # shape -> nr_states,actions
         state_obs = self.state_obs.view(-1, np.prod(self.state_shape))
 
         assert q.shape[0] == state_obs.shape[0], "q vs state_obs shape"
 
-        indexes = np.arange(0, self.nr_states)
+        # indexes = np.arange(0, self.nr_states)
+
+        ## valid indexes, ve se estados nao tem 1a acao com q com -1
+        indexes = np.where(q[:,0] != -1)[0]
+
         np.random.shuffle(indexes)
 
-        for i in range(0, self.nr_states, batch):
+        for i in range(0, len(indexes), batch):
             yield q[indexes[i:i + batch]], state_obs[indexes[i:i + batch]]
 
     # def get_possible_states_list(self):

@@ -36,10 +36,16 @@ def get_args():
     # parser.add_argument('--n-step', type=int, default=3)
     # parser.add_argument('--target-update-freq', type=int, default=500)
     parser.add_argument('--epoch', type=int, default=10)
-    parser.add_argument('--policy-epoch', type=int, default=4)
+    parser.add_argument('--policy-epoch', type=int, default=10)
+    parser.add_argument('--batch-size', type=int, default=1)
+
+
     # parser.add_argument('--step-per-epoch', type=int, default=10000)
     parser.add_argument('--collect-per-step', type=int, default=10)
-    parser.add_argument('--batch-size', type=int, default=32)
+
+
+
+
     parser.add_argument('--training-num', type=int, default=16)
     parser.add_argument('--test-num', type=int, default=10)
     parser.add_argument('--logdir', type=str, default='log')
@@ -83,7 +89,7 @@ def train_dpi(args):
     optim = torch.optim.Adam(net.parameters(), lr=args.lr)
 
     # define policy
-    policy = DPI(net, optim, discount_factor=0.99)
+    policy = DPI(net, optim, discount_factor=0.99,train_epochs=args.policy_epoch,batch_size=args.batch_size)
 
     # # load a previous policy
     if args.resume_path:
@@ -99,6 +105,7 @@ def train_dpi(args):
 
     # Training loop
     for e in range(args.epoch):
+        print(f"STEP {e}")
         # collect qs
         tabular_env.__init_q_states__()
         tabular_env.travel_state_actions(policy)
@@ -107,11 +114,11 @@ def train_dpi(args):
         policy.learn(tabular_env)
 
         # evaluation
-        scores = evaluate(policy, env, runs=5)
-        print(f"Eval Score: {scores.mean():.2f} +- {scores.std():.2f} Total registered q:", tabular_env.q.sum().item())
+        scores = evaluate(policy, env, runs=1,render=True)
+        print(f"Eval Score: {scores.mean():.2f} +- {scores.std():.2f} Total registered q: {tabular_env.q[tabular_env.q!=-1].sum().item()}\n")
 
 
-def evaluate(policy, env, runs=2):
+def evaluate(policy, env, runs=2,render=False):
     # simple evaluation, from init state
     total_scores = np.zeros(runs)
 
@@ -120,14 +127,14 @@ def evaluate(policy, env, runs=2):
         obs = env.reset()
         ep_reward = 0
 
-        # env.render()
+        if render: env.render()
 
         while not done:
             action = policy.forward([obs])
             obs, r, done, _ = env.step(action)
             ep_reward += r
 
-            # env.render()
+            if render: env.render()
 
         total_scores[i] = ep_reward
 

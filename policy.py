@@ -43,6 +43,13 @@ class DPI():
         # something like this, on random exploration?
         # q=q+torch.rand_like(q)*0.1
 
+        # epsilon greedy
+        # boltzman
+
+        # torch.softmax(q) #[0.249999999,0.250000001,0.24999999,0.249999999] #[0,0,0,0]
+        # q =to_numpy(torch.softmax(q[0],dim=-1))
+        # action = np.random.choice(np.arange(q.shape[-1]),p=q)
+
         action = to_numpy(q.max(dim=1)[1])  # choose max q
 
         return action
@@ -63,8 +70,11 @@ class DPI():
                 pred_q, _ = self.model(obs)
 
                 # target = torch.argmax(qs, dim=1)  # target is max q
+
+                # if same q value, chooses target at random
                 target = torch.argmax(torch.rand(*qs.shape) * (qs == qs.max(dim=1, keepdims=True)[0]), dim=1)
                 loss = self.criterion(pred_q, target)
+
                 loss.backward()
 
                 self.optim.step()
