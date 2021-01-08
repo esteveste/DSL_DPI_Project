@@ -9,6 +9,7 @@ from tianshou.data import Batch, ReplayBuffer, to_torch_as, to_numpy
 
 import utils
 
+import pdb
 
 class DPI():
     def __init__(self,
@@ -17,7 +18,7 @@ class DPI():
                  discount_factor: float = 0.99,
                  # reward_normalization: bool = False,
                  train_epochs=10,
-                 batch_size=16,
+                 batch_size=1,
                  **kwargs: Any, ):
 
         self.model = model
@@ -36,7 +37,7 @@ class DPI():
 
         self.criterion = nn.CrossEntropyLoss()
 
-    def forward(self, obs):
+    def forward(self, obs, eps=False): #eps can be False (greedy) or a number in [0,1]
 
         q, _ = self.model(obs)
 
@@ -50,7 +51,10 @@ class DPI():
         # q =to_numpy(torch.softmax(q[0],dim=-1))
         # action = np.random.choice(np.arange(q.shape[-1]),p=q)
 
-        action = to_numpy(q.max(dim=1)[1])  # choose max q
+        if eps != False and np.random.rand() < eps:
+            action = np.random.choice(np.arange(q.shape[-1]))
+        else:
+            action = to_numpy(q.max(dim=1)[1])  # choose max q
 
         return action
 
@@ -64,6 +68,7 @@ class DPI():
         for e in range(self.epochs):
             total_loss = 0
             for qs, obs in tabular_env.get_train_batch(self.batch_size):
+
                 self.optim.zero_grad()
 
                 # just copy q for now
@@ -84,7 +89,7 @@ class DPI():
 
                 total_loss += loss.item()
 
-            print(f"Epoch {e:2d}, Loss {total_loss / nr_states:.4f}")
+            print(f"Epoch {e:2d}, Loss {total_loss:.4f}")# / nr_states:.4f}")
 
         return loss
 

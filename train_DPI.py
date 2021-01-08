@@ -20,12 +20,17 @@ from policy import DPI
 from network import MLP
 from utils import *
 
+import matplotlib
+import matplotlib.pyplot as plt
+
+import pdb
 
 def get_args():
     parser = argparse.ArgumentParser()
-    # parser.add_argument('--task', type=str, default='MiniGrid-DoorKey-5x5-v0')
+    #parser.add_argument('--task', type=str, default='MiniGrid-DoorKey-5x5-v0')
     parser.add_argument('--task', type=str, default='MiniGrid-Empty-Random-5x5-v0')
-    # parser.add_argument('--task', type=str, default='MiniGrid-Empty-16x16-v0')
+    #parser.add_argument('--task', type=str, default='CartPole-v0')
+    #parser.add_argument('--task', type=str, default='MiniGrid-Empty-16x16-v0')
     parser.add_argument('--seed', type=int, default=0)
     # parser.add_argument('--eps-test', type=float, default=0.005)
     # parser.add_argument('--eps-train', type=float, default=1.)
@@ -35,14 +40,11 @@ def get_args():
     parser.add_argument('--gamma', type=float, default=0.99)
     # parser.add_argument('--n-step', type=int, default=3)
     # parser.add_argument('--target-update-freq', type=int, default=500)
-    parser.add_argument('--epoch', type=int, default=10)
-    parser.add_argument('--policy-epoch', type=int, default=10)
-    parser.add_argument('--batch-size', type=int, default=1)
-
-
+    parser.add_argument('--step', type=int, default=50)
+    parser.add_argument('--policy-epoch', type=int, default=1)
+    parser.add_argument('--batch-size', type=int, default=32)
     # parser.add_argument('--step-per-epoch', type=int, default=10000)
     parser.add_argument('--collect-per-step', type=int, default=10)
-
 
 
 
@@ -61,17 +63,18 @@ def get_args():
 
 
 def train_dpi(args):
-    env = make_minigrid_env(args.task)
+    if "CartPole" in args.task:
+        env = make_CartPole_env()
+        state_shape = env.observation_space.shape or env.observation_space.n
+        action_shape = 2
+    else:
+        env = make_minigrid_env(args.task)
+        state_shape = env.observation_space.shape or env.observation_space.n
 
-    state_shape = env.observation_space.shape or env.observation_space.n
-
-    if "MiniGrid" in args.task:
         if "Empty" in args.task:
             action_shape = 3  # selecting Basic actions in minigrid
         else:
             action_shape = 6  # all except done
-    else:
-        action_shape = env.env.action_space.shape or env.env.action_space.n
 
     print("Observations shape:", state_shape)
     print("Actions shape:", action_shape)
@@ -100,25 +103,40 @@ def train_dpi(args):
 
     if "MiniGrid" in args.task:
         tabular_env = Tabular_Minigrid(env)
+    else:
+        tabular_env = Tabular_CartPole(env)
 
     print(f"Num states: {tabular_env.nr_states}, Q table entries: {tabular_env.q.numel()}")
 
     # Training loop
-    for e in range(args.epoch):
-        print(f"STEP {e}")
+    steps = args.step
+    scores_steps = np.zeros(steps)
+    for s in range(steps):
+        print(f"STEP {s}")
         # collect qs
         tabular_env.__init_q_states__()
         tabular_env.travel_state_actions(policy)
+        
+        # net = MLP(state_shape, action_shape)
+        # optim = torch.optim.Adam(net.parameters(), lr=args.lr)
+        # policy = DPI(net, optim, discount_factor=0.99,train_epochs=args.policy_epoch,batch_size=args.batch_size)
 
         # learn new policy
         policy.learn(tabular_env)
 
         # evaluation
-        scores = evaluate(policy, env, runs=1,render=True)
+        scores = evaluate(policy, env, render=False)
+        scores_steps[s] = scores.mean()
         print(f"Eval Score: {scores.mean():.2f} +- {scores.std():.2f} Total registered q: {tabular_env.q[tabular_env.q!=-1].sum().item()}\n")
-
-
-def evaluate(policy, env, runs=2,render=False):
+        
+    
+    plt.figure()
+    plt.plot(scores_steps, label = "score")
+    plt.legend()
+    plt.xlabel("step")
+    plt.ylabel("score")
+    
+def evaluate(policy, env, runs=10,render=False):
     # simple evaluation, from init state
     total_scores = np.zeros(runs)
 
@@ -127,15 +145,17 @@ def evaluate(policy, env, runs=2,render=False):
         obs = env.reset()
         ep_reward = 0
 
-        if render: env.render()
+        #if render: env.render()
 
         while not done:
-            action = policy.forward([obs])
+            try:
+                action = policy.forward([obs])[0]
+            except:
+                action = policy.forward([obs])
             obs, r, done, _ = env.step(action)
             ep_reward += r
 
-            if render: env.render()
-
+            #if render: env.render()
         total_scores[i] = ep_reward
 
     return total_scores
