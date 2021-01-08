@@ -10,6 +10,8 @@ from gym import spaces, logger
 from gym.utils import seeding
 import numpy as np
 
+from gym.envs.registration import registry, register, make, spec
+
 
 class CartPoleEnv(gym.Env):
     """
@@ -219,3 +221,18 @@ class CartPoleEnv(gym.Env):
         if self.viewer:
             self.viewer.close()
             self.viewer = None
+
+
+register(
+    id='Custom-CartPole-v0',
+    entry_point='custom_env:CartPoleEnv',
+    max_episode_steps=200,
+    reward_threshold=195.0,
+)
+
+register(
+    id='Custom-CartPole-v1',
+    entry_point='gym.envs.classic_control:CartPoleEnv',
+    max_episode_steps=500,
+    reward_threshold=475.0,
+)

@@ -13,10 +13,13 @@ import pdb
 
 # gym_minigrid.wrappers.FlatObsWrapper
 
-def make_minigrid_env(name='MiniGrid-Empty-5x5-v0'):
+def make_minigrid_env(name='MiniGrid-Empty-5x5-v0', flatten=True):
     env = gym.make(name)
 
-    env = gym_minigrid.wrappers.FlatObsWrapper(env)
+    if flatten:
+        env = gym_minigrid.wrappers.FlatObsWrapper(env)
+    else:
+        env = gym_minigrid.wrappers.ImgObsWrapper(env)
 
     return env
 

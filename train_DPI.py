@@ -17,7 +17,7 @@ from tianshou.trainer import offpolicy_trainer
 from tianshou.data import Collector, ReplayBuffer
 
 from policy import DPI
-from network import MLP
+from network import MLP, ConvNet
 from utils import *
 
 import matplotlib
@@ -28,8 +28,9 @@ import pdb
 def get_args():
     parser = argparse.ArgumentParser()
     #parser.add_argument('--task', type=str, default='MiniGrid-DoorKey-5x5-v0')
-    parser.add_argument('--task', type=str, default='MiniGrid-Empty-Random-5x5-v0')
-    #parser.add_argument('--task', type=str, default='CartPole-v0')
+    # parser.add_argument('--task', type=str, default='MiniGrid-Empty-Random-5x5-v0')
+    parser.add_argument('--task', type=str, default='Custom-CartPole-v0')
+    # parser.add_argument('--task', type=str, default='Custom-CartPole-v1')
     #parser.add_argument('--task', type=str, default='MiniGrid-Empty-16x16-v0')
     parser.add_argument('--seed', type=int, default=0)
     # parser.add_argument('--eps-test', type=float, default=0.005)
@@ -41,7 +42,7 @@ def get_args():
     # parser.add_argument('--n-step', type=int, default=3)
     # parser.add_argument('--target-update-freq', type=int, default=500)
     parser.add_argument('--step', type=int, default=50)
-    parser.add_argument('--policy-epoch', type=int, default=1)
+    parser.add_argument('--policy-epoch', type=int, default=10)
     parser.add_argument('--batch-size', type=int, default=32)
     # parser.add_argument('--step-per-epoch', type=int, default=10000)
     parser.add_argument('--collect-per-step', type=int, default=10)
@@ -51,7 +52,7 @@ def get_args():
     parser.add_argument('--training-num', type=int, default=16)
     parser.add_argument('--test-num', type=int, default=10)
     parser.add_argument('--logdir', type=str, default='log')
-    parser.add_argument('--render', type=float, default=0.)
+    parser.add_argument('--render', default=False, action="store_true")
     parser.add_argument(
         '--device', type=str,
         default='cuda' if torch.cuda.is_available() else 'cpu')
@@ -63,12 +64,13 @@ def get_args():
 
 
 def train_dpi(args):
-    if "CartPole" in args.task:
-        env = make_CartPole_env()
+    if "Custom-CartPole" in args.task:
+        # env = make_CartPole_env()
+        env = gym.make(args.task)
         state_shape = env.observation_space.shape or env.observation_space.n
         action_shape = 2
     else:
-        env = make_minigrid_env(args.task)
+        env = make_minigrid_env(args.task,flatten=True) ## FIXME change to false if ConvNet
         state_shape = env.observation_space.shape or env.observation_space.n
 
         if "Empty" in args.task:
@@ -79,7 +81,7 @@ def train_dpi(args):
     print("Observations shape:", state_shape)
     print("Actions shape:", action_shape)
 
-    # seed FIXME
+    # seed FIXME, envs dont use seed on reset
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
 
@@ -88,6 +90,9 @@ def train_dpi(args):
     # test_envs.seed(args.seed)
 
     net = MLP(state_shape, action_shape)
+    # net = ConvNet(state_shape, action_shape)
+
+
 
     optim = torch.optim.Adam(net.parameters(), lr=args.lr)
 
@@ -125,7 +130,7 @@ def train_dpi(args):
         policy.learn(tabular_env)
 
         # evaluation
-        scores = evaluate(policy, env, render=False)
+        scores = evaluate(policy, env, render=args.render)
         scores_steps[s] = scores.mean()
         print(f"Eval Score: {scores.mean():.2f} +- {scores.std():.2f} Total registered q: {tabular_env.q[tabular_env.q!=-1].sum().item()}\n")
         
@@ -145,17 +150,25 @@ def evaluate(policy, env, runs=10,render=False):
         obs = env.reset()
         ep_reward = 0
 
-        #if render: env.render()
+        if render: env.render()
 
         while not done:
+
+            action = policy.forward([obs])
+
             try:
-                action = policy.forward([obs])[0]
+                action=action[0]
             except:
-                action = policy.forward([obs])
+                pass
+
+            assert action==0 or action==1
+
+
+
             obs, r, done, _ = env.step(action)
             ep_reward += r
 
-            #if render: env.render()
+            if render: env.render()
         total_scores[i] = ep_reward
 
     return total_scores

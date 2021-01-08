@@ -89,7 +89,7 @@ class DPI():
 
                 total_loss += loss.item()
 
-            print(f"Epoch {e:2d}, Loss {total_loss:.4f}")# / nr_states:.4f}")
+        print(f"Policy: Final Loss {total_loss:.4f}")# / nr_states:.4f}")
 
         return loss
 
